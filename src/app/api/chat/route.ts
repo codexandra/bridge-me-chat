@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { JsonDB, Config } from "node-json-db";
 
 export const runtime = "nodejs";
@@ -23,17 +23,21 @@ interface ChatRequest {
   conversationId?: string;
 }
 
-const openaiApiKey = process.env.OPENAI_API_KEY;
-let openaiClient: OpenAI | null = null;
+const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+const CLASSIFIER_MODEL =
+  process.env.CLAUDE_CLASSIFIER_MODEL || "claude-3-haiku-20240307";
+const CHAT_MODEL =
+  process.env.CLAUDE_MODEL || "claude-sonnet-4-5-20250929";
+let anthropicClient: Anthropic | null = null;
 
-function getOpenAI() {
-  if (!openaiApiKey) {
-    throw new Error("OPENAI_API_KEY is not set");
+function getAnthropic() {
+  if (!anthropicApiKey) {
+    throw new Error("ANTHROPIC_API_KEY is not set");
   }
-  if (!openaiClient) {
-    openaiClient = new OpenAI({ apiKey: openaiApiKey });
+  if (!anthropicClient) {
+    anthropicClient = new Anthropic({ apiKey: anthropicApiKey });
   }
-  return openaiClient;
+  return anthropicClient;
 }
 
 const encoder = new TextEncoder();
@@ -68,38 +72,34 @@ async function persistHistory(conversationId: string, entries: HistoryMessage[])
 
 async function detectMood(message: string, history: HistoryMessage[]): Promise<MoodResult> {
   try {
-    const openai = getOpenAI();
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const anthropic = getAnthropic();
+    const response = await anthropic.messages.create({
+      model: CLASSIFIER_MODEL,
+      max_tokens: 1024,
       temperature: 0,
-      max_tokens: 80,
+      system: [
+        "Classify the user's mood as negative, neutral, or positive.",
+        "Be decisive; if unclear, choose the closest.",
+        'Reply ONLY with JSON: {"mood":"negative|neutral|positive","confidence":0-1,"rationale":"short reason"}.',
+        "Hints:",
+        "- Positive: excited, interested, curious, engaged, optimistic.",
+        "- Neutral: flat/brief replies without affect, factual statements.",
+        "- Negative: stress, worry, frustration, sadness, hopelessness.",
+        "Sarcasm: if wording is positive but tone implies frustration, treat as negative.",
+        "If truly ambiguous, pick neutral; only lean negative when safety is at risk.",
+      ].join(" "),
       messages: [
-        {
-          role: "system",
-          content:
-            [
-              "Classify the user's mood as negative, neutral, or positive.",
-              "Be decisive; if unclear, choose the closest.",
-              "Reply ONLY with JSON: {\"mood\":\"negative|neutral|positive\",\"confidence\":0-1,\"rationale\":\"short reason\"}.",
-              "Hints:",
-              "- Positive: excited, interested, curious, engaged, optimistic.",
-              "- Neutral: flat/brief replies without affect, factual statements.",
-              "- Negative: stress, worry, frustration, sadness, hopelessness.",
-              "Sarcasm: if wording is positive but tone implies frustration, treat as negative.",
-              "If truly ambiguous, pick neutral; only lean negative when safety is at risk.",
-            ].join(" "),
-        },
         ...history.map((m) => ({ role: m.role, content: m.content })),
         { role: "user", content: message },
       ],
     });
 
-    const text = response.choices?.[0]?.message?.content;
-    if (!text || typeof text !== "string") {
+    const textBlock = response.content.find((c) => c.type === "text");
+    if (!textBlock || textBlock.type !== "text") {
       throw new Error("No text content from classifier");
     }
 
-    const parsed = JSON.parse(text) as MoodResult;
+    const parsed = JSON.parse(textBlock.text) as MoodResult;
     if (parsed.mood !== "negative" && parsed.mood !== "neutral" && parsed.mood !== "positive") {
       throw new Error("Invalid mood value");
     }
@@ -151,23 +151,22 @@ export async function POST(req: Request) {
   const system = buildSystemPrompt(mode);
 
   try {
-    if (!openaiApiKey) {
+    if (!anthropicApiKey) {
       return new Response(
         JSON.stringify({
-          error: "Missing OPENAI_API_KEY. Set it in .env.local and restart the dev server.",
+          error: "Missing ANTHROPIC_API_KEY. Set it in .env.local and restart the dev server.",
         }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    const openai = getOpenAI();
-    const stream = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const anthropic = getAnthropic();
+    const stream = await anthropic.messages.stream({
+      model: CHAT_MODEL,
       max_tokens: 240,
-      stream: true,
       temperature: 0.7,
+      system,
       messages: [
-        { role: "system", content: system },
         ...historyForModel.map((m) => ({ role: m.role, content: m.content })),
         { role: "user", content: message },
       ],
@@ -191,31 +190,17 @@ export async function POST(req: Request) {
             const streamIterable = stream as AsyncIterable<unknown>;
             for await (const event of streamIterable) {
               const evt = event as {
-                choices?: Array<{
-                  delta?: {
-                    content?: string | Array<{ type?: string; text?: string }>;
-                  };
-                  finish_reason?: string | null;
-                }>;
+                type?: string;
+                delta?: { type?: string; text?: string };
               };
 
-              const delta = evt.choices?.[0]?.delta?.content;
-              const text =
-                typeof delta === "string"
-                  ? delta
-                  : Array.isArray(delta)
-                    ? delta
-                        .map((d) => (d?.type === "text" ? d.text ?? "" : ""))
-                        .join("")
-                    : "";
-
-              if (text) {
+              if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+                const text = evt.delta.text ?? "";
                 assistantText += text;
                 controller.enqueue(sseChunk({ type: "token", content: text }));
               }
 
-              const finish = evt.choices?.[0]?.finish_reason;
-              if (finish) {
+              if (evt.type === "message_stop") {
                 controller.enqueue(sseChunk({ type: "done" }));
               }
             }

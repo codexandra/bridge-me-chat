@@ -1,4 +1,4 @@
- Bridge Me Chat — Technical Architecture (Candidate Review Document)
+ #  Bridge Me Chat — Technical Architecture (Candidate Review Document)
 
 *This document describes the planned architecture for Bridge's Me Chat system. Your task is to review, critique, and propose improvements.*
 
