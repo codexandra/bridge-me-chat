@@ -1,5 +1,10 @@
 This is the Bridge Me Chat mood-aware prototype: Next.js App Router + TypeScript + Claude streaming.
 
+Related docs:
+- [Architecture Review](docs/Bridge_MEChat_Architecture_ForReview.md)
+- [Home Task](docs/Bridge_MEChat_HomeTask.md)
+- [Prototype Spec](docs/BRIDGE_MECHAT_PROTOTYPE.md)
+
 ## Setup
 1) Install dependencies
 ```bash
@@ -9,6 +14,8 @@ npm install
 ```bash
 cp .env.local.example .env.local
 # set ANTHROPIC_API_KEY
+# optional: CLAUDE_MODEL (default claude-sonnet-4-5-20250929)
+# optional: CLAUDE_CLASSIFIER_MODEL (default claude-3-haiku-20240307)
 ```
 
 ## Run

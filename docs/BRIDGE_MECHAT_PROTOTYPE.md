@@ -72,18 +72,19 @@ interface ChatStreamEnvelope {
 | "It's fine, I can handle it."              | Neutral       | Exploratory   | Self-assured but emotionally neutral.          |
 
 ## Edge Cases
-| Edge Case                 | Why Hard?                                    | Handling in Prototype                                                                            | Production Improvements                                               |
-| ------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| "Great, just great."      | Words are positive; tone may be negative.    | Consider sarcasm; if confidence < 0.4, default Supportive.                                       | Add sarcasm detector/paralinguistic cues.                             |
-| "I'm fine."               | Commonly hides negative affect.              | Low confidence -> Supportive; gentle probing follow-up.                                           | Track history for deviations; empathetic clarifiers.                  |
-| "I'm excited but also nervous." | Mixed positive/negative signals.         | Treat as mixed; prefer Supportive; surface rationale.                                             | Multi-label moods and blended tone; gather more context.              |
-| "ok" / "sure"             | Minimal signal; high ambiguity.              | Neutral with low confidence; exploratory + clarifier.                                             | Use conversation context and user history; avoid overconfidence.      |
-| "Maybe, or maybe not."    | Explicit ambivalence, no valence.            | Neutral, low confidence; ask for clarification.                                                   | Use prior context; adjust confidence thresholds for ambiguity.        |
-| "Yeah, whatever you think." | Indifferent or dismissive; tone unclear.    | If confidence low, lean Supportive and check in.                                                  | Model tone/intent separately; use history to disambiguate irritation. |
-| "Sure, fine, I guess."    | Hedges suggest resignation; ambiguous.       | Bias toward Supportive when multiple hedges appear; note low confidence.                          | Add hedging-intensity signals and user baseline comparison.           |
+| Edge Case                       | Why Hard?                                 | Handling in Prototype                                                    | Production Improvements                                               |
+| ------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| "Great, just great."            | Words are positive; tone may be negative. | Consider sarcasm; if confidence < 0.4, default Supportive.               | Add sarcasm detector/paralinguistic cues.                             |
+| "I'm fine."                     | Commonly hides negative affect.           | Low confidence -> Supportive; gentle probing follow-up.                  | Track history for deviations; empathetic clarifiers.                  |
+| "I'm excited but also nervous." | Mixed positive/negative signals.          | Treat as mixed; prefer Supportive; surface rationale.                    | Multi-label moods and blended tone; gather more context.              |
+| "ok" / "sure"                   | Minimal signal; high ambiguity.           | Neutral with low confidence; exploratory + clarifier.                    | Use conversation context and user history; avoid overconfidence.      |
+| "Maybe, or maybe not."          | Explicit ambivalence, no valence.         | Neutral, low confidence; ask for clarification.                          | Use prior context; adjust confidence thresholds for ambiguity.        |
+| "Yeah, whatever you think."     | Indifferent or dismissive; tone unclear.  | If confidence low, lean Supportive and check in.                         | Model tone/intent separately; use history to disambiguate irritation. |
+| "Sure, fine, I guess."          | Hedges suggest resignation; ambiguous.    | Bias toward Supportive when multiple hedges appear; note low confidence. | Add hedging-intensity signals and user baseline comparison.           |
 
 ## Notes & Assumptions
-- OpenAI API key via `OPENAI_API_KEY`.
+- Anthropic API key via `ANTHROPIC_API_KEY`
+`.
 - Run with Next.js edge runtime to minimize latency; keep detection call lightweight.
 - No persistence needed for prototype; in-memory chat list is sufficient for demo.
 - Console logs and UI badge satisfy "visible decision" requirement.

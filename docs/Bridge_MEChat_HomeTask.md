@@ -1,4 +1,5 @@
 # Part 1: Architecture & Decisions
+## A. Architecture Critique 
 
 ## Problem 1: Multi-Agent Execution on the Critical Path
 
@@ -107,6 +108,8 @@ Here is the diagram.
 
 
 
+
+
 ## B. Tech Stack Decisions (30 min)
 
 ### What would *you* choose for Bridge — and why?
@@ -184,3 +187,120 @@ I’d revisit LangGraph or similar abstractions if:
 - You introduce **tool-heavy planning loops**
 
 Until then, a custom, opinionated orchestration layer is the right level of abstraction.
+
+## C. One Clarifying Question
+
+- Question
+  
+  What is the single source of truth for a user’s psychological profile over time—raw observations/events, framework scores, or the profile summary?
+
+- Why this matters
+
+  This decision determines how the entire system is built and trusted. If observations/events are the source of truth, the system can explain decisions, replay history, fix mistakes, and safely evolve prompts and frameworks. If scores or summaries are treated as truth, errors compound silently, contradictions become unresolvable, and calibration becomes impossible. Clarifying this upfront prevents architectural lock-in and long-term trust issues.
+
+
+
+
+
+
+
+# Part 2: Focused Build — Mood-Aware Chat
+
+## Overview
+
+  I built a small Mood-Aware Chat prototype where the AI adapts its conversational style based on the detected emotional tone of the user’s message.
+
+  The system:
+
+  - detects mood from the user message
+
+  - routes the response to either Supportive or Exploratory mode
+
+  - streams the AI response token-by-token
+
+  - makes the routing decision visible to the user
+
+  - includes test cases and edge case analysis
+
+
+
+## Client Experience
+- Simple layout: message list, streaming assistant bubble, pill showing `Mode: Supportive | Exploratory` with mood badge and rationale.
+- Input form with submit + enter key handling, fixed at bottom of conversation panel.
+- Console logs `mood`, `mode`, `rationale` for visibility; test cases and edge cases in sidebars with "Use" buttons to prefill input.
+
+## Test Data Table
+| Test Message                               | Expected Mood | Expected Mode | Why This Case Matters                          |
+| ------------------------------------------ | ------------- | ------------- | ---------------------------------------------- |
+| "I'm so stressed about work"               | Negative      | Supportive    | Clear negative signal and stress term.         |
+| "That's interesting, tell me more."        | Positive      | Exploratory   | Engaged and curious tone.                      |
+| "Feeling kind of down lately"              | Negative      | Supportive    | Soft negative language ("down").               |
+| "I think things are okay, just busy"       | Neutral       | Exploratory   | Balanced/neutral sentiment with mild pressure. |
+| "Super excited about the new project!"     | Positive      | Exploratory   | High-energy positive cue ("excited").          |
+| "Nothing seems to be working out"          | Negative      | Supportive    | Strong negative generalization.                |
+| "Curious what you think about my approach" | Positive      | Exploratory   | Invitation to explore ideas.                   |
+| "Not sure, maybe it's fine"                | Neutral       | Exploratory   | Low-certainty, neutral/ambivalent language.    |
+| "I'm exhausted and it's all too much"      | Negative      | Supportive    | Combined fatigue + overwhelm.                  |
+| "This could be fun"                        | Positive      | Exploratory   | Light positive optimism.                       |
+| "Everything feels pointless lately."       | Negative      | Supportive    | Hopeless tone implies negative mood.           |
+| "I guess I'm okay, just tired."            | Neutral       | Exploratory   | Neutral/low-energy without strong negative.    |
+| "Can't wait to share my progress."         | Positive      | Exploratory   | Excited anticipation and eagerness.            |
+| "I'm worried this might not work out."     | Negative      | Supportive    | Clear worry/anxiety about outcome.             |
+| "It's fine, I can handle it."              | Neutral       | Exploratory   | Self-assured but emotionally neutral.          |
+
+## Edge Cases
+| Edge Case                       | Why Hard?                                 | Handling in Prototype                                                    | Production Improvements                                               |
+| ------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| "Great, just great."            | Words are positive; tone may be negative. | Consider sarcasm; if confidence < 0.4, default Supportive.               | Add sarcasm detector/paralinguistic cues.                             |
+| "I'm fine."                     | Commonly hides negative affect.           | Low confidence -> Supportive; gentle probing follow-up.                  | Track history for deviations; empathetic clarifiers.                  |
+| "I'm excited but also nervous." | Mixed positive/negative signals.          | Treat as mixed; prefer Supportive; surface rationale.                    | Multi-label moods and blended tone; gather more context.              |
+| "ok" / "sure"                   | Minimal signal; high ambiguity.           | Neutral with low confidence; exploratory + clarifier.                    | Use conversation context and user history; avoid overconfidence.      |
+| "Maybe, or maybe not."          | Explicit ambivalence, no valence.         | Neutral, low confidence; ask for clarification.                          | Use prior context; adjust confidence thresholds for ambiguity.        |
+| "Yeah, whatever you think."     | Indifferent or dismissive; tone unclear.  | If confidence low, lean Supportive and check in.                         | Model tone/intent separately; use history to disambiguate irritation. |
+| "Sure, fine, I guess."          | Hedges suggest resignation; ambiguous.    | Bias toward Supportive when multiple hedges appear; note low confidence. | Add hedging-intensity signals and user baseline comparison.           |
+
+
+
+### C. Accuracy Reflection
+
+- Rough accuracy: ~80–85% on the provided test cases.
+
+- Struggles with: Sarcasm, masked emotions, and very short messages.
+
+- Error preference: False positives (supportive when not needed) are more acceptable than missing genuine negative emotion.
+
+
+
+
+## Decision Log
+
+- Mood Detection Approach
+
+    I used an LLM-based classifier for speed and clarity. Alternatives considered included keyword-based heuristics, but those fail quickly on nuance and phrasing. For production, I’d combine LLM classification with lightweight heuristics and temporal smoothing.
+
+- Streaming Implementation
+
+    I used Server-Sent Events because they’re simple, well-supported in Next.js, and sufficient for one-way token streaming. WebSockets felt unnecessary for this scope.
+
+- Project Structure
+
+    /app — UI and routing
+
+    /app/api/chat — streaming + orchestration
+
+    /lib/moodDetection.ts — classification logic
+
+    /lib/prompts.ts — system prompts
+
+    With more time, I’d separate orchestration from transport more cleanly.
+
+
+- Time Allocation (~2 hours)
+
+    Mood detection + routing logic: ~30 min
+
+    Streaming API + UI hookup: ~40 min
+
+    Test cases + edge case analysis: ~30 min
+
+    README + decision log: ~20 min
