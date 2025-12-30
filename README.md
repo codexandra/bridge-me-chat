@@ -24,7 +24,7 @@ npm run dev
 - Sidebars include test cases and edge cases with “Use” buttons to prefill input.
 
 ## Decision Log
-- **Mood detection approach:** Claude (`claude-3-5-sonnet-20241022`) JSON classifier (mood, confidence, rationale) for nuance (sarcasm, mixed signals). Considered rules-only sentiment but chose LLM for richer cues.
+- **Mood detection approach:** Claude (`claude-sonnet-4-5-202509292`) JSON classifier (mood, confidence, rationale) for nuance (sarcasm, mixed signals). Considered rules-only sentiment but chose LLM for richer cues.
 - **Streaming implementation:** SSE over Claude streaming; client consumes `meta` then `token` events for responsiveness. Simpler than polling or websockets for this prototype.
 - **Project structure:** Next.js App Router with components under `src/app/components`, data under `src/app/data`, types under `src/app/types`, API in `src/app/api/chat/route.ts`. With more time: split hooks/state, add tests, and move persistence to a real DB.
 - **Time allocation:** Roughly—setup (~20m), API/mood + streaming (~35m), UI/chat + panels (~40m), cleanup/styling/lint/docs (~25m).
